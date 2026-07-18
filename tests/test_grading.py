@@ -58,7 +58,7 @@ def test_degenerate_inputs_dont_crash():
 def test_exposed_over_mcp():
     tools = {t["name"] for t in handle(
         {"jsonrpc": "2.0", "id": 1, "method": "tools/list"})["result"]["tools"]}
-    assert tools == {"calc", "search", "grade_answer"}
+    assert {"calc", "search", "grade_answer"} <= tools
     r = handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
         "name": "grade_answer",
         "arguments": {"answer": "It improves accuracy by 47%.", "sources": SOURCES}}})

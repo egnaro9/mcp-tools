@@ -22,6 +22,7 @@ from typing import Any, Callable, Dict, Optional, TextIO
 
 from . import __version__
 from .grading import format_report, grade_answer
+from .live import compare_runs, model_drift
 from .tools import ToolError, calc, search
 
 PROTOCOL_VERSION = "2025-06-18"
@@ -71,6 +72,31 @@ TOOLS = [
             "required": ["answer", "sources"],
         },
     },
+    {
+        "name": "model_drift",
+        "description": "Look up how a live LLM is currently scoring on a public, frozen eval suite "
+                       "(accuracy, latency, answer length, reliability, refusal rate) and whether "
+                       "those moved since the previous weekly run. Use it to check whether a model "
+                       "you're about to rely on has quietly changed. Omit `model` to list every "
+                       "tracked model.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"model": {"type": "string",
+                                     "description": "e.g. 'gpt-5', 'claude-opus', 'gemini' — "
+                                                    "matched loosely; omit for all"}},
+        },
+    },
+    {
+        "name": "compare_runs",
+        "description": "Ask whether a project's most recent stored eval run regressed against the "
+                       "one before it — per-case, so a better average can't hide a case that broke.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"suite": {"type": "string",
+                                     "description": "the suite/run name, e.g. 'rag-eval-lab'"}},
+            "required": ["suite"],
+        },
+    },
 ]
 
 _DISPATCH: Dict[str, Callable[[dict], Any]] = {}
@@ -96,7 +122,9 @@ def _initialize(params: dict) -> dict:
         "capabilities": {"tools": {"listChanged": False}},
         "serverInfo": {"name": "mcp-tools", "version": __version__},
         "instructions": "Three safe tools: `calc` (arithmetic, no eval), `search` (BM25 over a bundled corpus), "
-                        "and `grade_answer` (check a draft answer against its sources for unsupported claims).",
+                        "`grade_answer` (check a draft answer against its sources for unsupported claims), "
+                        "`model_drift` (is a live model still scoring what it used to?), and "
+                        "`compare_runs` (did a project's latest eval run regress?).",
     }
 
 
@@ -128,6 +156,10 @@ def _tools_call(params: dict) -> dict:
                                   threshold=float(args.get("threshold", 0.6)))
             # isError stays false: an unsupported claim is a finding, not a tool failure
             return _text_result(format_report(result))
+        if name == "model_drift":
+            return _text_result(model_drift(str(args.get("model", ""))))
+        if name == "compare_runs":
+            return _text_result(compare_runs(str(args["suite"])))
     except ToolError as e:
         return _text_result(f"error: {e}", is_error=True)
     except KeyError as e:

@@ -3,18 +3,20 @@
 [![ci](https://github.com/egnaro9/mcp-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/egnaro9/mcp-tools/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://www.python.org/)
 [![MCP](https://img.shields.io/badge/MCP-2025--06--18-6e40c9)](https://modelcontextprotocol.io)
-[![tests](https://img.shields.io/badge/tests-19-brightgreen)](tests)
+[![tests](https://img.shields.io/badge/tests-31-brightgreen)](tests)
 
 **A Model Context Protocol server, implemented from the spec — no MCP SDK, no dependencies.**
 
 [MCP](https://modelcontextprotocol.io) is how a language-model client (Claude Desktop, an agent) discovers and calls tools a server exposes. It's JSON-RPC 2.0; a local server speaks it over **stdio**. This repo implements that protocol directly — the whole surface a tool server needs is `initialize` → `notifications/initialized` → `tools/list` → `tools/call` — so the protocol is legible instead of hidden behind a library.
 
-It exposes three tools, all **safe by construction** and all deterministic:
+It exposes five tools, all **safe by construction** — three fully local and deterministic, two read-only lookups against public endpoints (no keys, no writes):
 
 | Tool | What it does | Why it's safe |
 | --- | --- | --- |
 | `calc` | Evaluate an arithmetic expression | Parses to an AST and allow-lists arithmetic nodes only — no `eval`, so `__import__('os')` is *rejected, not executed*. The **[OWASP LLM06 (Excessive Agency)](https://genai.owasp.org/llmrisk/llm06-2025-excessive-agency/)** mitigation: a tool that can do arithmetic and nothing else. |
 | `search` | BM25 keyword search over a bundled corpus | Read-only, no network, no filesystem. The ranking is Okapi BM25 — the same length-normalised, saturation-aware scoring that [matches the published SciFact baseline in rag-eval-lab](https://github.com/egnaro9/rag-eval-lab), reimplemented here so this server has **zero dependencies**. |
+| `model_drift` | Is a live model still scoring what it used to? | Read-only GET of the public [model-drift](https://github.com/egnaro9/model-drift) board — accuracy, latency, answer length, reliability and refusal rate for 16 models, plus what moved since last week's run. No key, no write. |
+| `compare_runs` | Did a project's latest eval run regress against the one before it? | Read-only GET of [eval-history](https://github.com/egnaro9/eval-history)'s per-case comparison — so a better average can't hide the case that broke. |
 | `grade_answer` | Check a draft answer against its sources and name the sentences they don't support | **No LLM judge.** A model grading hallucination is itself a model output — you can't tell a real unsupported claim from the judge having an off day, and you can't reproduce last week's verdict. This is lexical: a figure that appears nowhere in the sources fails the sentence outright (invented statistics are the strongest tell), and low content-word coverage flags claims the sources never make. |
 
 ## Use it with Claude Desktop
@@ -62,8 +64,14 @@ python -m mcptools        # serves on stdio; type/paste JSON-RPC, one message pe
 An MCP server you can only exercise with Claude Desktop open isn't really testable. Because the protocol is plain JSON-RPC, the dispatch is a pure function of a message — so the [suite](tests/test_server.py) drives the real handshake directly *and* launches the server in a subprocess and speaks MCP to it over stdio, asserting that three requests get three replies and the notification gets none. The guardrail is tested through the protocol too: code thrown at `calc` comes back as an MCP tool-error (`isError: true`), so the model sees the failure and the server stays up.
 
 ```bash
-pip install -e ".[dev]" && pytest -q     # 19 tests, stdlib only
+pip install -e ".[dev]" && pytest -q     # 31 tests, stdlib only
 ```
+
+The two live tools are tested against fixtures, never the network: the fetcher is
+resolved at call time so a test can substitute it, and the suite passes with
+sockets blocked. What *is* tested for real is failure — a network problem comes
+back as an MCP tool error the model can read and route around, not an exception
+that takes the server down for every other tool.
 
 ## Design notes
 

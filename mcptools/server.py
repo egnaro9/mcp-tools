@@ -121,7 +121,7 @@ def _initialize(params: dict) -> dict:
         "protocolVersion": client_version if client_version == PROTOCOL_VERSION else PROTOCOL_VERSION,
         "capabilities": {"tools": {"listChanged": False}},
         "serverInfo": {"name": "mcp-tools", "version": __version__},
-        "instructions": "Three safe tools: `calc` (arithmetic, no eval), `search` (BM25 over a bundled corpus), "
+        "instructions": "Five safe tools: `calc` (arithmetic, no eval), `search` (BM25 over a bundled corpus), "
                         "`grade_answer` (check a draft answer against its sources for unsupported claims), "
                         "`model_drift` (is a live model still scoring what it used to?), and "
                         "`compare_runs` (did a project's latest eval run regress?).",

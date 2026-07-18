@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mcp-tools"
 version = "0.1.0"
-description = "A from-scratch Model Context Protocol server (stdio, stdlib-only): safe calc + BM25 search."
+description = "A from-scratch Model Context Protocol server (stdio, stdlib-only): safe calc, BM25 search, deterministic answer grading, and read-only model-drift/eval-run lookups."
 requires-python = ">=3.11"
 dependencies = []
 license = {text = "MIT"}

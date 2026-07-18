@@ -1,4 +1,4 @@
-"""The tools this server exposes — both safe by construction.
+"""The two tools implemented in this module — both safe by construction.
 
 - `calc` evaluates arithmetic without `eval()`: it walks a parsed AST and
   permits arithmetic nodes only, so a model that emits `__import__("os")` gets a
@@ -8,7 +8,9 @@
   saturation-aware ranking that matches the published SciFact baseline in
   rag-eval-lab, reimplemented here so this server has zero dependencies.
 
-Nothing here reaches the network or the filesystem; the whole server is stdlib.
+No tool *argument* reaches the network or the filesystem: `calc` is pure, and `search`
+reads its corpus once at import. (The `live` module's tools do make read-only GETs.)
+The whole server is stdlib — no third-party dependencies.
 """
 from __future__ import annotations
 

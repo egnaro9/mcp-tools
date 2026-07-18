@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcp-tools"
+version = "0.1.0"
+description = "A from-scratch Model Context Protocol server (stdio, stdlib-only): safe calc + BM25 search."
+requires-python = ">=3.11"
+dependencies = []
+license = {text = "MIT"}
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+mcp-tools = "mcptools.server:serve"
+
+[tool.setuptools]
+packages = ["mcptools"]
+
+[tool.setuptools.package-data]
+mcptools = ["corpus.json"]

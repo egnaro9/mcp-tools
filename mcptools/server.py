@@ -21,6 +21,7 @@ import sys
 from typing import Any, Callable, Dict, Optional, TextIO
 
 from . import __version__
+from .grading import format_report, grade_answer
 from .tools import ToolError, calc, search
 
 PROTOCOL_VERSION = "2025-06-18"
@@ -50,6 +51,26 @@ TOOLS = [
             "required": ["query"],
         },
     },
+    {
+        "name": "grade_answer",
+        "description": "Check a draft answer against its sources and report which sentences the "
+                       "sources do NOT support — fabricated figures and claims the sources never "
+                       "make. Deterministic and lexical, not a model judgement. Call this on your "
+                       "own answer before giving it to the user when the answer is supposed to be "
+                       "grounded in provided material.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "answer": {"type": "string", "description": "the answer to check"},
+                "sources": {"type": "array", "items": {"type": "string"},
+                            "description": "the source texts the answer is supposed to rest on"},
+                "threshold": {"type": "number",
+                              "description": "min fraction of a sentence's content words that must "
+                                             "appear in the sources (default 0.6)", "default": 0.6},
+            },
+            "required": ["answer", "sources"],
+        },
+    },
 ]
 
 _DISPATCH: Dict[str, Callable[[dict], Any]] = {}
@@ -74,7 +95,8 @@ def _initialize(params: dict) -> dict:
         "protocolVersion": client_version if client_version == PROTOCOL_VERSION else PROTOCOL_VERSION,
         "capabilities": {"tools": {"listChanged": False}},
         "serverInfo": {"name": "mcp-tools", "version": __version__},
-        "instructions": "Two safe tools: `calc` (arithmetic, no eval) and `search` (BM25 over a bundled corpus).",
+        "instructions": "Three safe tools: `calc` (arithmetic, no eval), `search` (BM25 over a bundled corpus), "
+                        "and `grade_answer` (check a draft answer against its sources for unsupported claims).",
     }
 
 
@@ -98,6 +120,14 @@ def _tools_call(params: dict) -> dict:
         if name == "search":
             k = int(args.get("k", 3))
             return _text_result(search(str(args["query"]), k=max(1, min(k, 10))))
+        if name == "grade_answer":
+            sources = args["sources"]
+            if isinstance(sources, str):        # be forgiving: a lone string is one source
+                sources = [sources]
+            result = grade_answer(str(args["answer"]), [str(s) for s in sources],
+                                  threshold=float(args.get("threshold", 0.6)))
+            # isError stays false: an unsupported claim is a finding, not a tool failure
+            return _text_result(format_report(result))
     except ToolError as e:
         return _text_result(f"error: {e}", is_error=True)
     except KeyError as e:

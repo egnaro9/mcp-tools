@@ -38,9 +38,9 @@ def test_unknown_method_is_a_protocol_error():
 
 
 # ── tools/list ─────────────────────────────────────────────────────────
-def test_tools_list_returns_both_tools_with_schemas():
+def test_tools_list_returns_the_tools_with_schemas():
     tools = {t["name"]: t for t in rpc("tools/list")["result"]["tools"]}
-    assert set(tools) == {"calc", "search"}
+    assert set(tools) == {"calc", "search", "grade_answer"}
     assert tools["calc"]["inputSchema"]["required"] == ["expression"]
 
 
@@ -95,5 +95,5 @@ def test_full_handshake_over_stdio_subprocess():
     # Three requests → three replies; the notification produced none.
     assert [r["id"] for r in replies] == [1, 2, 3]
     assert replies[0]["result"]["serverInfo"]["name"] == "mcp-tools"
-    assert {t["name"] for t in replies[1]["result"]["tools"]} == {"calc", "search"}
+    assert {t["name"] for t in replies[1]["result"]["tools"]} == {"calc", "search", "grade_answer"}
     assert replies[2]["result"]["content"][0]["text"] == "42"

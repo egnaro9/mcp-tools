@@ -23,4 +23,4 @@ jobs:
           printf '%s\n' \
             '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}' \
             '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-            | python -m mcptools | python -c "import sys,json; rs=[json.loads(l) for l in sys.stdin]; assert rs[0]['result']['protocolVersion']=='2025-06-18'; assert {t['name'] for t in rs[1]['result']['tools']}=={'calc','search'}; print('MCP handshake OK')"
+            | python -m mcptools | python -c "import sys,json; rs=[json.loads(l) for l in sys.stdin]; assert rs[0]['result']['protocolVersion']=='2025-06-18'; assert {'calc','search','grade_answer','model_drift','compare_runs'} <= {t['name'] for t in rs[1]['result']['tools']}; print('MCP handshake OK')"

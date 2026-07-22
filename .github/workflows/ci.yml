@@ -17,10 +17,42 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
-      - run: pytest -q
+      - name: Tests + coverage gate
+        run: pytest -q --cov=mcptools --cov-report=term-missing --cov-fail-under=88
       - name: The server answers a real MCP handshake over stdio
         run: |
           printf '%s\n' \
             '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}' \
             '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
             | python -m mcptools | python -c "import sys,json; rs=[json.loads(l) for l in sys.stdin]; assert rs[0]['result']['protocolVersion']=='2025-06-18'; assert {'calc','search','grade_answer','model_drift','compare_runs'} <= {t['name'] for t in rs[1]['result']['tools']}; print('MCP handshake OK')"
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - name: ruff
+        run: ruff check mcptools tests
+      - name: mypy
+        run: mypy mcptools --ignore-missing-imports
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -t mcp-tools .
+      # Built AND run: launch the container the way an MCP client would and
+      # assert it completes a real handshake over stdio. stderr (logs) is
+      # discarded so only the JSON-RPC on stdout is parsed — the same stdout
+      # purity the server depends on.
+      - name: Run the image and complete an MCP handshake
+        run: |
+          printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"calc","arguments":{"expression":"6*7"}}}' \
+            | docker run -i --rm mcp-tools 2>/dev/null \
+            | python -c "import sys,json; rs=[json.loads(l) for l in sys.stdin]; assert rs[1]['result']['content'][0]['text']=='42', rs; print('docker MCP run OK')"

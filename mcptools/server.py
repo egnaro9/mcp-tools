@@ -18,9 +18,10 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from typing import Any, Callable, Dict, Optional, TextIO
 
-from . import __version__
+from . import __version__, obs
 from .grading import format_report, grade_answer
 from .live import compare_runs, model_drift
 from .tools import ToolError, calc, search
@@ -138,33 +139,54 @@ def _tools_list(params: dict) -> dict:
     return {"tools": TOOLS}
 
 
+def _run_tool(name: Optional[str], args: dict) -> dict:
+    """Dispatch one tool by name. Raises ToolError (→ tool-error result), KeyError
+    (→ missing-argument RPC error), or _RpcError (unknown tool)."""
+    if name == "calc":
+        return _text_result(calc(str(args["expression"])))
+    if name == "search":
+        k = int(args.get("k", 3))
+        return _text_result(search(str(args["query"]), k=max(1, min(k, 10))))
+    if name == "grade_answer":
+        sources = args["sources"]
+        if isinstance(sources, str):        # be forgiving: a lone string is one source
+            sources = [sources]
+        result = grade_answer(str(args["answer"]), [str(s) for s in sources],
+                              threshold=float(args.get("threshold", 0.6)))
+        # isError stays false: an unsupported claim is a finding, not a tool failure
+        return _text_result(format_report(result))
+    if name == "model_drift":
+        return _text_result(model_drift(str(args.get("model", ""))))
+    if name == "compare_runs":
+        return _text_result(compare_runs(str(args["suite"])))
+    raise _RpcError(-32602, f"unknown tool: {name!r}")
+
+
 @_method("tools/call")
 def _tools_call(params: dict) -> dict:
     name = params.get("name")
     args = params.get("arguments") or {}
+    start = time.perf_counter()
+    is_error = False
+    result: Optional[dict] = None
     try:
-        if name == "calc":
-            return _text_result(calc(str(args["expression"])))
-        if name == "search":
-            k = int(args.get("k", 3))
-            return _text_result(search(str(args["query"]), k=max(1, min(k, 10))))
-        if name == "grade_answer":
-            sources = args["sources"]
-            if isinstance(sources, str):        # be forgiving: a lone string is one source
-                sources = [sources]
-            result = grade_answer(str(args["answer"]), [str(s) for s in sources],
-                                  threshold=float(args.get("threshold", 0.6)))
-            # isError stays false: an unsupported claim is a finding, not a tool failure
-            return _text_result(format_report(result))
-        if name == "model_drift":
-            return _text_result(model_drift(str(args.get("model", ""))))
-        if name == "compare_runs":
-            return _text_result(compare_runs(str(args["suite"])))
+        result = _run_tool(name, args)
+        is_error = bool(result.get("isError"))
+        return result
     except ToolError as e:
-        return _text_result(f"error: {e}", is_error=True)
+        is_error = True
+        result = _text_result(f"error: {e}", is_error=True)
+        return result
     except KeyError as e:
+        is_error = True
         raise _RpcError(-32602, f"missing required argument: {e}")
-    raise _RpcError(-32602, f"unknown tool: {name!r}")
+    except Exception:
+        is_error = True                     # unknown tool / anything else — still a failed call
+        raise
+    finally:
+        # One JSON line to stderr + a metric per call; result is None on the
+        # RPC-error paths, which record_call handles.
+        obs.record_call(name, args, result, is_error, (time.perf_counter() - start) * 1000)
 
 
 class _RpcError(Exception):
@@ -198,6 +220,8 @@ def handle(message: dict) -> Optional[dict]:
 
 def serve(stdin: TextIO = sys.stdin, stdout: TextIO = sys.stdout) -> None:
     """Read newline-delimited JSON-RPC from stdin, write responses to stdout."""
+    obs.configure_logging()   # logs to stderr — stdout is the protocol channel
+    obs.logger.info("mcp-tools serving on stdio", extra={"version": __version__})
     for line in stdin:
         line = line.strip()
         if not line:
@@ -213,3 +237,5 @@ def serve(stdin: TextIO = sys.stdin, stdout: TextIO = sys.stdout) -> None:
         if response is not None:
             stdout.write(json.dumps(response) + "\n")
             stdout.flush()
+    # stdin closed: the client went away. Leave a one-line usage summary behind.
+    obs.logger.info("mcp-tools stopping", extra=obs.metrics.snapshot())

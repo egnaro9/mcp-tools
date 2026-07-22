@@ -64,7 +64,7 @@ python -m mcptools        # serves on stdio; type/paste JSON-RPC, one message pe
 An MCP server you can only exercise with Claude Desktop open isn't really testable. Because the protocol is plain JSON-RPC, the dispatch is a pure function of a message — so the [suite](tests/test_server.py) drives the real handshake directly *and* launches the server in a subprocess and speaks MCP to it over stdio, asserting that three requests get three replies and the notification gets none. The guardrail is tested through the protocol too: code thrown at `calc` comes back as an MCP tool-error (`isError: true`), so the model sees the failure and the server stays up.
 
 ```bash
-pip install -e ".[dev]" && pytest -q     # 31 tests, stdlib only
+pip install -e ".[dev]" && pytest -q     # 39 tests, stdlib only
 ```
 
 The two live tools are tested against fixtures, never the network: the fetcher is
@@ -72,6 +72,35 @@ resolved at call time so a test can substitute it, and the suite passes with
 sockets blocked. What *is* tested for real is failure — a network problem comes
 back as an MCP tool error the model can read and route around, not an exception
 that takes the server down for every other tool.
+
+## Operating it: logs, metrics, and an optional trail
+
+A server you deploy needs more than correct replies — and all three of these are
+stdlib, none of them touch stdout (that's the JSON-RPC channel; a stray write
+corrupts the protocol):
+
+- **Structured logs on stderr.** Every `tools/call` emits one JSON line — tool,
+  `duration_ms`, `isError`, and the size of each argument — with a `serving` and
+  a `stopping` line bracketing the session, the latter carrying a per-tool usage
+  summary. See [`obs.py`](mcptools/obs.py).
+- **In-process metrics.** Calls and errors per tool, as a snapshot and on shutdown.
+- **An optional result trail.** Point `MCPTOOLS_DB` at a file and the results of
+  `grade_answer` and `model_drift` are persisted to SQLite — one row per call,
+  behind a hand-rolled migration keyed on `PRAGMA user_version` (the
+  zero-dependency form of Alembic). Unset, nothing is written and the server
+  behaves exactly as before. See [`store.py`](mcptools/store.py).
+
+### Run it in Docker
+
+```bash
+docker build -t mcp-tools .
+docker run -i --rm mcp-tools           # MCP over stdio; -i keeps stdin open
+# persist the trail — mount a dir and point MCPTOOLS_DB at it:
+docker run -i --rm -v "$PWD/data:/data" -e MCPTOOLS_DB=/data/history.db mcp-tools
+```
+
+CI builds this image and completes a real MCP handshake *through* it, so "it runs
+in a container" is checked, not claimed.
 
 ## Design notes
 

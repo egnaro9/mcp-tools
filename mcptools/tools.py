@@ -22,12 +22,13 @@ import os
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple
 
 # ───────────────────────── calc: AST allow-list ──────────────────────────
-_BINOPS = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul, ast.Div: op.truediv,
-           ast.Pow: op.pow, ast.Mod: op.mod, ast.FloorDiv: op.floordiv}
-_UNARY = {ast.UAdd: op.pos, ast.USub: op.neg}
+_BINOPS: Dict[type, Callable[[float, float], float]] = {
+    ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul, ast.Div: op.truediv,
+    ast.Pow: op.pow, ast.Mod: op.mod, ast.FloorDiv: op.floordiv}
+_UNARY: Dict[type, Callable[[float], float]] = {ast.UAdd: op.pos, ast.USub: op.neg}
 
 
 class ToolError(ValueError):
@@ -88,7 +89,7 @@ class BM25:
         q = [t for t in _tok(query) if t in self._idf]
         if not q:
             return []
-        cands = set()
+        cands: set[int] = set()
         for t in q:
             cands.update(self._post.get(t, ()))
         scored = []

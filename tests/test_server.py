@@ -90,7 +90,7 @@ def test_full_handshake_over_stdio_subprocess():
     stdin = "".join(json.dumps(m) + "\n" for m in msgs)
     proc = subprocess.run([sys.executable, "-m", "mcptools"], input=stdin,
                           capture_output=True, text=True, timeout=30)
-    replies = [json.loads(l) for l in proc.stdout.splitlines() if l.strip()]
+    replies = [json.loads(ln) for ln in proc.stdout.splitlines() if ln.strip()]
 
     # Three requests → three replies; the notification produced none.
     assert [r["id"] for r in replies] == [1, 2, 3]

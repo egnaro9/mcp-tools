@@ -1,11 +1,11 @@
 # mcp-tools
 
+**A Model Context Protocol server, implemented from the spec — no MCP SDK, no dependencies.**
+
 [![ci](https://github.com/egnaro9/mcp-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/egnaro9/mcp-tools/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://www.python.org/)
 [![MCP](https://img.shields.io/badge/MCP-2025--06--18-6e40c9)](https://modelcontextprotocol.io)
 [![tests](https://img.shields.io/badge/tests-39-brightgreen)](tests)
-
-**A Model Context Protocol server, implemented from the spec — no MCP SDK, no dependencies.**
 
 [MCP](https://modelcontextprotocol.io) is how a language-model client (Claude Desktop, an agent) discovers and calls tools a server exposes. It's JSON-RPC 2.0; a local server speaks it over **stdio**. This repo implements that protocol directly — the whole surface a tool server needs is `initialize` → `notifications/initialized` → `tools/list` → `tools/call` — so the protocol is legible instead of hidden behind a library.
 
@@ -26,7 +26,6 @@ It exposes five tools, all **safe by construction** — three fully local and de
 server stays up, and the next call flags the one sentence the source does not support.
 Run it yourself: `./demo/session.sh`.
 [Play it as a terminal session](https://asciinema.org/a/2Z6upN3kkviX1DYO) — the text is selectable.*
-
 
 ## Use it with Claude Desktop
 

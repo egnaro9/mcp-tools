@@ -18,8 +18,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import closing
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 # Each entry brings the schema up by one version. Index i (0-based) migrates from
 # user_version i to i+1, so a fresh database runs them all and an existing one
@@ -40,7 +39,7 @@ _MIGRATIONS: list[str] = [
 
 
 def _utcnow() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 class ResultStore:
@@ -68,7 +67,7 @@ class ResultStore:
         with closing(self._connect()) as c:
             return int(c.execute("PRAGMA user_version").fetchone()[0])
 
-    def record(self, tool: str, summary: str, detail: Optional[dict] = None) -> None:
+    def record(self, tool: str, summary: str, detail: dict | None = None) -> None:
         with closing(self._connect()) as c:
             c.execute(
                 "INSERT INTO tool_events (tool, created_at, summary, detail) VALUES (?, ?, ?, ?)",
@@ -76,7 +75,7 @@ class ResultStore:
             )
             c.commit()
 
-    def recent(self, tool: Optional[str] = None, limit: int = 20) -> list[dict]:
+    def recent(self, tool: str | None = None, limit: int = 20) -> list[dict]:
         """Most recent first, optionally filtered to one tool."""
         query = "SELECT tool, created_at, summary, detail FROM tool_events"
         params: tuple = ()

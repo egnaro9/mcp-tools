@@ -6,7 +6,12 @@ gracefully*, since a tool that raises kills the server for every other tool.
 """
 import pytest
 
-from mcptools.live import (compare_runs, model_drift, summarize_comparison, summarize_drift)
+from mcptools.live import (
+    compare_runs,
+    model_drift,
+    summarize_comparison,
+    summarize_drift,
+)
 from mcptools.server import handle
 from mcptools.tools import ToolError
 

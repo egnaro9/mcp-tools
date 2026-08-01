@@ -26,7 +26,7 @@ to cut.
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Sequence
+from collections.abc import Sequence
 
 # Small, deliberately boring stopword list — words whose presence says nothing
 # about whether a claim is supported.
@@ -53,19 +53,19 @@ _WORD = re.compile(r"[a-z0-9][a-z0-9'\-]*")
 _NUMBER = re.compile(r"\d+(?:\.\d+)?%?")
 
 
-def _content_words(text: str) -> List[str]:
+def _content_words(text: str) -> list[str]:
     return [w for w in _WORD.findall(text.lower()) if w not in _STOP and not w.isdigit()]
 
 
-def _numbers(text: str) -> List[str]:
+def _numbers(text: str) -> list[str]:
     return [n.rstrip("%") for n in _NUMBER.findall(text)]
 
 
-def sentences(text: str) -> List[str]:
+def sentences(text: str) -> list[str]:
     return [s.strip() for s in _SENTENCE.split(text.strip()) if s.strip()]
 
 
-def grade_answer(answer: str, sources: Sequence[str], threshold: float = 0.6) -> Dict:
+def grade_answer(answer: str, sources: Sequence[str], threshold: float = 0.6) -> dict:
     """Check each sentence of `answer` against `sources`.
 
     Returns the faithfulness score, the per-sentence detail, and — the useful
@@ -82,7 +82,7 @@ def grade_answer(answer: str, sources: Sequence[str], threshold: float = 0.6) ->
     src_words = set(_content_words(src_text))
     src_numbers = set(_numbers(src_text))
 
-    claims: List[Dict] = []
+    claims: list[dict] = []
     for sent in sentences(answer):
         words = _content_words(sent)
         if not words:                      # e.g. "Yes." — no claim to check
@@ -108,7 +108,7 @@ def grade_answer(answer: str, sources: Sequence[str], threshold: float = 0.6) ->
             "unsupported": unsupported, "verdict": verdict, "claims": claims}
 
 
-def format_report(result: Dict) -> str:
+def format_report(result: dict) -> str:
     """Render the grade for a model to read — verdict first, then what to fix."""
     lines = [f"faithfulness {result['faithfulness']:.0%} — {result['verdict']}"]
     if result["unsupported"]:

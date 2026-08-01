@@ -8,8 +8,10 @@ from mcptools.grading import format_report, grade_answer
 from mcptools.server import handle
 
 SOURCES = [
-    "BM25 is a ranking function that scores documents using term frequency saturation "
-    "and document length normalization.",
+    (
+        "BM25 is a ranking function that scores documents using term frequency saturation "
+        "and document length normalization."
+    ),
     "It was developed as part of the Okapi information retrieval system.",
 ]
 

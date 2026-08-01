@@ -18,7 +18,6 @@ import logging
 import os
 import sys
 import threading
-from typing import Optional
 
 from .store import ResultStore
 
@@ -81,7 +80,7 @@ metrics = Metrics()
 _store_cache: dict[str, ResultStore] = {}
 
 
-def _current_store() -> Optional[ResultStore]:
+def _current_store() -> ResultStore | None:
     """The result store for MCPTOOLS_DB, or None if it's unset. Cached per path so
     a long-lived server opens the database once."""
     path = os.environ.get("MCPTOOLS_DB")
@@ -92,7 +91,7 @@ def _current_store() -> Optional[ResultStore]:
     return _store_cache[path]
 
 
-def _result_text(result: Optional[dict]) -> str:
+def _result_text(result: dict | None) -> str:
     if not result:
         return ""
     try:
@@ -101,7 +100,7 @@ def _result_text(result: Optional[dict]) -> str:
         return ""
 
 
-def record_call(name: Optional[str], args: dict, result: Optional[dict],
+def record_call(name: str | None, args: dict, result: dict | None,
                 is_error: bool, ms: float) -> None:
     """Log the call, update metrics, and persist the result for the tools we keep
     a trail of. Never raises into the request path — observability must not be

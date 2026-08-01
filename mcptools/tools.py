@@ -21,14 +21,14 @@ import operator as op
 import os
 import re
 from collections import Counter, defaultdict
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Dict, List, Tuple
 
 # ───────────────────────── calc: AST allow-list ──────────────────────────
-_BINOPS: Dict[type, Callable[[float, float], float]] = {
+_BINOPS: dict[type, Callable[[float, float], float]] = {
     ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul, ast.Div: op.truediv,
     ast.Pow: op.pow, ast.Mod: op.mod, ast.FloorDiv: op.floordiv}
-_UNARY: Dict[type, Callable[[float], float]] = {ast.UAdd: op.pos, ast.USub: op.neg}
+_UNARY: dict[type, Callable[[float], float]] = {ast.UAdd: op.pos, ast.USub: op.neg}
 
 
 class ToolError(ValueError):
@@ -62,14 +62,14 @@ def calc(expression: str) -> str:
 _TOKEN = re.compile(r"[a-z0-9]+")
 
 
-def _tok(text: str) -> List[str]:
+def _tok(text: str) -> list[str]:
     return _TOKEN.findall(text.lower())
 
 
 class BM25:
     """Okapi BM25 over a set of documents. Same algorithm as rag-eval-lab."""
 
-    def __init__(self, docs: Dict[str, str], k1: float = 1.5, b: float = 0.75) -> None:
+    def __init__(self, docs: dict[str, str], k1: float = 1.5, b: float = 0.75) -> None:
         self.k1, self.b = k1, b
         self.ids = list(docs)
         self.texts = docs
@@ -78,14 +78,14 @@ class BM25:
         n = len(self._toks) or 1
         self._avg = sum(len(d) for d in self._toks) / n
         df: Counter = Counter()
-        self._post: Dict[str, List[int]] = defaultdict(list)
+        self._post: dict[str, list[int]] = defaultdict(list)
         for i, toks in enumerate(self._toks):
             for t in set(toks):
                 df[t] += 1
                 self._post[t].append(i)
         self._idf = {t: max(0.0, math.log((n - c + 0.5) / (c + 0.5) + 1.0)) for t, c in df.items()}
 
-    def search(self, query: str, k: int = 3) -> List[Tuple[str, str, float]]:
+    def search(self, query: str, k: int = 3) -> list[tuple[str, str, float]]:
         q = [t for t in _tok(query) if t in self._idf]
         if not q:
             return []
@@ -103,7 +103,7 @@ class BM25:
         return scored[:k]
 
 
-def _load_corpus() -> Dict[str, str]:
+def _load_corpus() -> dict[str, str]:
     """Bundled default corpus, overridable with MCPTOOLS_CORPUS=/path/to.json.
 
     The file is `{ "doc-id": "text", ... }` — point it at your own notes and the

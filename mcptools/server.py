@@ -19,7 +19,8 @@ from __future__ import annotations
 import json
 import sys
 import time
-from typing import Any, Callable, Dict, Optional, TextIO
+from collections.abc import Callable
+from typing import Any, TextIO
 
 from . import __version__, obs
 from .grading import format_report, grade_answer
@@ -100,7 +101,7 @@ TOOLS = [
     },
 ]
 
-_DISPATCH: Dict[str, Callable[[dict], Any]] = {}
+_DISPATCH: dict[str, Callable[[dict], Any]] = {}
 
 
 def _text_result(text: str, is_error: bool = False) -> dict:
@@ -139,7 +140,7 @@ def _tools_list(params: dict) -> dict:
     return {"tools": TOOLS}
 
 
-def _run_tool(name: Optional[str], args: dict) -> dict:
+def _run_tool(name: str | None, args: dict) -> dict:
     """Dispatch one tool by name. Raises ToolError (→ tool-error result), KeyError
     (→ missing-argument RPC error), or _RpcError (unknown tool)."""
     if name == "calc":
@@ -168,7 +169,7 @@ def _tools_call(params: dict) -> dict:
     args = params.get("arguments") or {}
     start = time.perf_counter()
     is_error = False
-    result: Optional[dict] = None
+    result: dict | None = None
     try:
         result = _run_tool(name, args)
         is_error = bool(result.get("isError"))
@@ -195,7 +196,7 @@ class _RpcError(Exception):
         self.code, self.message = code, message
 
 
-def handle(message: dict) -> Optional[dict]:
+def handle(message: dict) -> dict | None:
     """Process one JSON-RPC message. Returns a response dict, or None for a notification."""
     mid = message.get("id")
     method = message.get("method", "")

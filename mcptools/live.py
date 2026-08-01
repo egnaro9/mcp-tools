@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
-from typing import Callable, Dict, List, Optional
+from collections.abc import Callable
 
 from .tools import ToolError
 
@@ -61,9 +61,9 @@ def _fmt(value, kind: str) -> str:
     return f"{value:.0f} chars"
 
 
-def summarize_drift(data: Dict, query: str = "") -> str:
+def summarize_drift(data: dict, query: str = "") -> str:
     """Format the board's latest numbers for whichever models match `query`."""
-    series: Dict[str, List[dict]] = data.get("series", {})
+    series: dict[str, list[dict]] = data.get("series", {})
     real = {k: v for k, v in series.items() if not k.startswith("mock:") and v}
     if not real:
         return "The board has no recorded runs yet."
@@ -93,14 +93,14 @@ def summarize_drift(data: Dict, query: str = "") -> str:
     return "\n".join(lines)
 
 
-def model_drift(model: str = "", fetch: Optional[Callable[[str], dict]] = None) -> str:
+def model_drift(model: str = "", fetch: Callable[[str], dict] | None = None) -> str:
     # resolved at call time, not bound as a default — otherwise the real fetcher is
     # captured at import and no test could substitute it (CI would hit the network)
     return summarize_drift((fetch or _fetch)(METRICS_URL), model)
 
 
 # ── compare_runs ───────────────────────────────────────────────────────
-def summarize_comparison(cmp: Dict, suite: str) -> str:
+def summarize_comparison(cmp: dict, suite: str) -> str:
     verdict = cmp.get("verdict", "unknown")
     regs, imps = cmp.get("regressions") or [], cmp.get("improvements") or []
     flagged = cmp.get("newly_flagged") or []
@@ -118,7 +118,7 @@ def summarize_comparison(cmp: Dict, suite: str) -> str:
     return "\n".join(lines)
 
 
-def compare_runs(suite: str, fetch: Optional[Callable[[str], dict]] = None) -> str:
+def compare_runs(suite: str, fetch: Callable[[str], dict] | None = None) -> str:
     from urllib.parse import quote
     if not suite or not suite.strip():
         raise ToolError("give a suite name (the eval-history 'run' name, e.g. 'rag-eval-lab')")

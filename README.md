@@ -3,7 +3,7 @@
 [![ci](https://github.com/egnaro9/mcp-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/egnaro9/mcp-tools/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://www.python.org/)
 [![MCP](https://img.shields.io/badge/MCP-2025--06--18-6e40c9)](https://modelcontextprotocol.io)
-[![tests](https://img.shields.io/badge/tests-31-brightgreen)](tests)
+[![tests](https://img.shields.io/badge/tests-39-brightgreen)](tests)
 
 **A Model Context Protocol server, implemented from the spec — no MCP SDK, no dependencies.**
 
@@ -18,6 +18,15 @@ It exposes five tools, all **safe by construction** — three fully local and de
 | `model_drift` | Is a live model still scoring what it used to? | Read-only GET of the public [model-drift](https://github.com/egnaro9/model-drift) board — accuracy, latency, answer length, reliability and refusal rate for 16 models, plus what moved since last week's run. No key, no write. |
 | `compare_runs` | Did a project's latest eval run regress against the one before it? | Read-only GET of [eval-history](https://github.com/egnaro9/eval-history)'s per-case comparison — so a better average can't hide the case that broke. |
 | `grade_answer` | Check a draft answer against its sources and name the sentences they don't support | **No LLM judge.** A model grading hallucination is itself a model output — you can't tell a real unsupported claim from the judge having an off day, and you can't reproduce last week's verdict. This is lexical: a figure that appears nowhere in the sources fails the sentence outright (invented statistics are the strongest tell), and low content-word coverage flags claims the sources never make. |
+
+<img src="docs/demo.gif" alt="A real stdio MCP session: calc refuses an RCE payload with isError, then grade_answer names an invented statistic in a draft answer" width="100%">
+
+*A real MCP session over stdio — no client, no key, no network. `calc` is handed
+`__import__("os").system("rm -rf ~")` and answers `isError` with the AST element it refused; the
+server stays up, and the next call flags the one sentence the source does not support.
+Run it yourself: `./demo/session.sh`.
+[Play it as a terminal session](https://asciinema.org/a/2Z6upN3kkviX1DYO) — the text is selectable.*
+
 
 ## Use it with Claude Desktop
 

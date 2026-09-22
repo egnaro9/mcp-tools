@@ -13,7 +13,7 @@ It exposes five tools, all **safe by construction** — three fully local and de
 
 | Tool | What it does | Why it's safe |
 | --- | --- | --- |
-| `calc` | Evaluate an arithmetic expression | Parses to an AST and allow-lists arithmetic nodes only — no `eval`, so `__import__('os')` is *rejected, not executed*. The **[OWASP LLM06 (Excessive Agency)](https://genai.owasp.org/llmrisk/llm06-2025-excessive-agency/)** mitigation: a tool that can do arithmetic and nothing else. |
+| `calc` | Evaluate an arithmetic expression | Parses to an AST and allow-lists arithmetic nodes only — no `eval`, so `__import__('os')` is *rejected, not executed*. The **[OWASP LLM06 (Excessive Agency)](https://genai.owasp.org/llmrisk/llm062025-excessive-agency/)** mitigation: a tool that can do arithmetic and nothing else. |
 | `search` | BM25 keyword search over a bundled corpus | Read-only, no network. The corpus is read once at startup; no tool argument can reach the filesystem. The ranking is Okapi BM25 — the same length-normalised, saturation-aware scoring that [matches the published SciFact baseline in rag-eval-lab](https://github.com/egnaro9/rag-eval-lab), reimplemented here so this server has **zero dependencies**. |
 | `model_drift` | Is a live model still scoring what it used to? | Read-only GET of the public [model-drift](https://github.com/egnaro9/model-drift) board — accuracy, latency, answer length, reliability and refusal rate for 16 models, plus what moved since last week's run. No key, no write. |
 | `compare_runs` | Did a project's latest eval run regress against the one before it? | Read-only GET of [eval-history](https://github.com/egnaro9/eval-history)'s per-case comparison — so a better average can't hide the case that broke. |

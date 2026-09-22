@@ -26,7 +26,9 @@ from collections.abc import Callable
 from .tools import ToolError
 
 METRICS_URL = "https://raw.githubusercontent.com/egnaro9/model-drift/main/dashboard/metrics.json"
-EVAL_HISTORY = "https://eval-history.onrender.com"
+# eval-history's hosted instance was retired; its read routes are exported as
+# static files that mirror the old API paths with a `.json` suffix.
+EVAL_HISTORY = "https://erikhill.dev/eval-history"
 # Some hosts (Cloudflare in front of an API) reject urllib's default agent outright.
 USER_AGENT = "mcp-tools/1.0 (+https://github.com/egnaro9/mcp-tools)"
 TIMEOUT = 30
@@ -122,7 +124,7 @@ def compare_runs(suite: str, fetch: Callable[[str], dict] | None = None) -> str:
     from urllib.parse import quote
     if not suite or not suite.strip():
         raise ToolError("give a suite name (the eval-history 'run' name, e.g. 'rag-eval-lab')")
-    cmp = (fetch or _fetch)(f"{EVAL_HISTORY}/suites/{quote(suite.strip())}/latest-comparison")
+    cmp = (fetch or _fetch)(f"{EVAL_HISTORY}/suites/{quote(suite.strip())}/latest-comparison.json")
     if not cmp or cmp.get("verdict") is None:
         return f"{suite}: not enough runs stored yet to compare (needs two)."
     return summarize_comparison(cmp, suite.strip())

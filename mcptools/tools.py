@@ -26,6 +26,7 @@ from collections import Counter, defaultdict
 from collections.abc import Callable
 from pathlib import Path
 
+
 # ───────────────────────── calc: AST allow-list ──────────────────────────
 class ToolError(ValueError):
     """A tool-execution error — reported to the client, never a crash."""

@@ -6,6 +6,8 @@ import json
 import subprocess
 import sys
 
+import pytest
+
 from mcptools.server import PROTOCOL_VERSION, handle
 
 
@@ -57,6 +59,48 @@ def test_calc_rejects_code_as_a_tool_error_not_a_crash():
     r = rpc("tools/call", {"name": "calc", "arguments": {"expression": "__import__('os').system('ls')"}})
     assert r["result"]["isError"] is True
     assert "unsafe" in r["result"]["content"][0]["text"].lower()
+
+
+def test_calc_refuses_an_expression_whose_result_is_too_wide_to_compute():
+    """Pure arithmetic is not automatically cheap.
+
+    `9 ** 9 ** 9` passes the AST allow-list, because every node in it IS
+    arithmetic. Its result is about 369 million digits, so before the exponent
+    was bounded this call never returned: an availability bug reachable from one
+    model-emitted string, under a README promising safety. The timing assertion
+    is the real subject. Raising ToolError is easy; refusing *without first
+    starting the multiplication* is the property that matters.
+    """
+    import time
+
+    from mcptools.tools import ToolError, calc
+
+    start = time.monotonic()
+    with pytest.raises(ToolError, match="digits"):
+        calc("9**9**9")
+    assert time.monotonic() - start < 1.0
+
+    # The bound must not eat ordinary exponentiation.
+    assert calc("2**10") == "1024"
+    assert calc("2**0.5").startswith("1.414")
+
+
+def test_calc_reports_overflow_as_a_tool_error_not_a_crash():
+    """`1e300**2` is well formed, in bounds for the digit check, and overflows.
+
+    That surfaced as a bare OverflowError, which is a crash in a module whose
+    docstring says errors are reported to the client.
+    """
+    from mcptools.tools import ToolError, calc
+
+    with pytest.raises(ToolError, match="undefined arithmetic"):
+        calc("1e300**2")
+
+
+def test_calc_refusal_reaches_the_client_as_isError():
+    r = rpc("tools/call", {"name": "calc", "arguments": {"expression": "9**9**9"}})
+    assert r["result"]["isError"] is True
+    assert "digits" in r["result"]["content"][0]["text"]
 
 
 # ── tools/call: search ─────────────────────────────────────────────────

@@ -1,9 +1,11 @@
-"""The two tools implemented in this module — both safe by construction.
+"""The two tools implemented in this module.
 
 - `calc` evaluates arithmetic without `eval()`: it walks a parsed AST and
   permits arithmetic nodes only, so a model that emits `__import__("os")` gets a
   rejection, not a shell. That's the OWASP LLM06 (Excessive Agency) mitigation —
-  a tool that can do arithmetic and *nothing else*.
+  a tool that can do arithmetic and *nothing else*. Arithmetic is not
+  automatically cheap, though: the exponent is bounded (`_guarded_pow`), because
+  an expression can be pure arithmetic and still never return.
 - `search` is BM25 over a small bundled corpus: the same length-normalised,
   saturation-aware ranking that matches the published SciFact baseline in
   rag-eval-lab, reimplemented here so this server has zero dependencies.
@@ -25,14 +27,32 @@ from collections.abc import Callable
 from pathlib import Path
 
 # ───────────────────────── calc: AST allow-list ──────────────────────────
-_BINOPS: dict[type, Callable[[float, float], float]] = {
-    ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul, ast.Div: op.truediv,
-    ast.Pow: op.pow, ast.Mod: op.mod, ast.FloorDiv: op.floordiv}
-_UNARY: dict[type, Callable[[float], float]] = {ast.UAdd: op.pos, ast.USub: op.neg}
-
-
 class ToolError(ValueError):
     """A tool-execution error — reported to the client, never a crash."""
+
+
+# Rejecting injection and bounding cost are two different jobs, and the
+# allow-list only ever did the first. `9 ** 9 ** 9` parses clean and allow-lists
+# clean: every node is arithmetic. Its result is about 369 million digits, so
+# CPython starts multiplying and the call does not return on any useful
+# timescale. That is a denial of service reachable from one model-emitted
+# string, in a tool whose docstring promised the opposite. Estimate the width of
+# the result first, and refuse rather than begin.
+_MAX_POW_DIGITS = 1_000
+
+
+def _guarded_pow(base: float, exponent: float) -> float:
+    if abs(base) > 1 and exponent > 0 and exponent * math.log10(abs(base)) > _MAX_POW_DIGITS:
+        raise ToolError(
+            f"refusing {base}**{exponent}: the result would exceed "
+            f"{_MAX_POW_DIGITS} digits")
+    return op.pow(base, exponent)
+
+
+_BINOPS: dict[type, Callable[[float, float], float]] = {
+    ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul, ast.Div: op.truediv,
+    ast.Pow: _guarded_pow, ast.Mod: op.mod, ast.FloorDiv: op.floordiv}
+_UNARY: dict[type, Callable[[float], float]] = {ast.UAdd: op.pos, ast.USub: op.neg}
 
 
 def _eval(node: ast.AST) -> float:
@@ -54,7 +74,13 @@ def calc(expression: str) -> str:
         tree = ast.parse(expression, mode="eval")
     except SyntaxError as e:
         raise ToolError(f"not a valid expression: {expression!r}") from e
-    result = _eval(tree)
+    # Well-formed arithmetic can still be undefined (4/0) or overflow
+    # (1e300**2). Both raise ArithmeticError, which would leave this module as a
+    # crash rather than the reported error its docstring promises.
+    try:
+        result = _eval(tree)
+    except ArithmeticError as e:
+        raise ToolError(f"undefined arithmetic in {expression!r}: {e}") from e
     return str(int(result) if result == int(result) else result)
 
 

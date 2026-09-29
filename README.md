@@ -5,15 +5,15 @@
 [![ci](https://github.com/egnaro9/mcp-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/egnaro9/mcp-tools/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://www.python.org/)
 [![MCP](https://img.shields.io/badge/MCP-2025--06--18-6e40c9)](https://modelcontextprotocol.io)
-[![tests](https://img.shields.io/badge/tests-39-brightgreen)](tests)
+[![tests](https://img.shields.io/badge/tests-42-brightgreen)](tests)
 
 [MCP](https://modelcontextprotocol.io) is how a language-model client (Claude Desktop, an agent) discovers and calls tools a server exposes. It's JSON-RPC 2.0; a local server speaks it over **stdio**. This repo implements that protocol directly — the whole surface a tool server needs is `initialize` → `notifications/initialized` → `tools/list` → `tools/call` — so the protocol is legible instead of hidden behind a library.
 
-It exposes five tools, all **safe by construction** — three fully local and deterministic, two read-only lookups against public endpoints (no keys, no writes):
+It exposes five tools: three fully local and deterministic, two read-only lookups against public endpoints (no keys, no writes). Each one **refuses what it cannot do safely instead of attempting it**, and refusal covers two separate things: an input that isn't arithmetic at all, and an input that is arithmetic but whose answer is too expensive to compute.
 
 | Tool | What it does | Why it's safe |
 | --- | --- | --- |
-| `calc` | Evaluate an arithmetic expression | Parses to an AST and allow-lists arithmetic nodes only — no `eval`, so `__import__('os')` is *rejected, not executed*. The **[OWASP LLM06 (Excessive Agency)](https://genai.owasp.org/llmrisk/llm062025-excessive-agency/)** mitigation: a tool that can do arithmetic and nothing else. |
+| `calc` | Evaluate an arithmetic expression | Parses to an AST and allow-lists arithmetic nodes only — no `eval`, so `__import__('os')` is *rejected, not executed*. The **[OWASP LLM06 (Excessive Agency)](https://genai.owasp.org/llmrisk/llm062025-excessive-agency/)** mitigation: a tool that can do arithmetic and nothing else. Arithmetic still has to be affordable, so the exponent is bounded: `9 ** 9 ** 9` allow-lists clean (every node is arithmetic) and its result runs to roughly 369 million digits, so it is **refused rather than computed**. Rejecting injection and bounding cost are different jobs. |
 | `search` | BM25 keyword search over a bundled corpus | Read-only, no network. The corpus is read once at startup; no tool argument can reach the filesystem. The ranking is Okapi BM25 — the same length-normalised, saturation-aware scoring that [matches the published SciFact baseline in rag-eval-lab](https://github.com/egnaro9/rag-eval-lab), reimplemented here so this server has **zero dependencies**. |
 | `model_drift` | Is a live model still scoring what it used to? | Read-only GET of the public [model-drift](https://github.com/egnaro9/model-drift) board — accuracy, latency, answer length, reliability and refusal rate for 16 models, plus what moved since last week's run. No key, no write. |
 | `compare_runs` | Did a project's latest eval run regress against the one before it? | Read-only GET of [eval-history](https://github.com/egnaro9/eval-history)'s per-case comparison — so a better average can't hide the case that broke. |

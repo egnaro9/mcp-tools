@@ -72,7 +72,7 @@ python -m mcptools        # serves on stdio; type/paste JSON-RPC, one message pe
 An MCP server you can only exercise with Claude Desktop open isn't really testable. Because the protocol is plain JSON-RPC, the dispatch is a pure function of a message — so the [suite](tests/test_server.py) drives the real handshake directly *and* launches the server in a subprocess and speaks MCP to it over stdio, asserting that three requests get three replies and the notification gets none. The guardrail is tested through the protocol too: code thrown at `calc` comes back as an MCP tool-error (`isError: true`), so the model sees the failure and the server stays up.
 
 ```bash
-pip install -e ".[dev]" && pytest -q     # 42 tests, stdlib only
+pip install -e ".[dev]" && pytest -q     # 53 tests, stdlib only
 ```
 
 The two live tools are tested against fixtures, never the network: the fetcher is

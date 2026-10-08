@@ -16,7 +16,6 @@ from mcptools.live import summarize_drift
 from mcptools.obs import Metrics
 from mcptools.tools import BM25
 
-
 # ───────────────────────────────── BM25 ─────────────────────────────────
 
 def _index() -> BM25:

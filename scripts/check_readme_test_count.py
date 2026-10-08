@@ -13,6 +13,14 @@ It FAILS CLOSED, deliberately, in three ways that a looser version would let pas
   - a collection that errors fails, rather than being read as zero tests.
   - EVERY occurrence must match, not the first. Two of the five repositories state the count
     twice, and one of them had both stale.
+  - a test FILE that contributes no collected test fails. This one was learned the hard way,
+    hours after the rest shipped: agent-graph's tests/test_rag.py opens with
+    `pytest.importorskip("ragevallab")`, so without the optional `rag` extra the whole module
+    vanishes at collection with NO error and no mention. pytest says "58 tests collected" and
+    means it. An earlier version of this check read that 58, agreed with a README that had
+    just been edited to match it, and would have frozen the wrong number in place; CI, which
+    installs `.[dev,rag]`, collects 67. A count is only meaningful if the environment is
+    complete, and the only evidence of incompleteness is a file on disk that produced nothing.
 
 The pattern is `\\b(\\d+) tests\\b`, plural and word-bounded, so prose like "300 test claims"
 is not mistaken for a declaration. Write a historical count without the word, or this will
@@ -30,9 +38,11 @@ import sys
 
 DECLARED = re.compile(r"\b(\d+) tests\b")
 COLLECTED = re.compile(r"^(\d+) tests? collected", re.M)
+# A file may opt out of the empty-file rule by saying so in its own text.
+EXEMPT = "check-readme-test-count: exempt"
 
 
-def collected_count(root: pathlib.Path) -> int:
+def collect(root: pathlib.Path) -> tuple[int, str]:
     p = subprocess.run([sys.executable, "-m", "pytest", "--collect-only", "-q",
                         "-p", "no:cacheprovider"],
                        cwd=root, capture_output=True, text=True)
@@ -42,7 +52,35 @@ def collected_count(root: pathlib.Path) -> int:
             "FAIL: could not read a test count from pytest --collect-only.\n"
             "A collection that does not report a number is not zero tests, it is an error.\n"
             + (p.stdout or p.stderr)[-1500:])
-    return int(m.group(1))
+    return int(m.group(1)), p.stdout
+
+
+def silent_empty_test_files(root: pathlib.Path, stdout: str) -> list[str]:
+    """Test files on disk that contributed no collected test.
+
+    A module skipped by `pytest.importorskip` leaves no error and no line of output, so the
+    only way to notice is to compare the collection against the filesystem.
+    """
+    tests_dir = root / "tests"
+    if not tests_dir.is_dir():
+        return []
+    seen = {line.split("::", 1)[0].strip() for line in stdout.splitlines() if "::" in line}
+    missing, exempt = [], []
+    for f in sorted(tests_dir.rglob("test_*.py")):
+        rel = f.relative_to(root).as_posix()
+        if any(s == rel or s.endswith("/" + rel) or s.endswith(rel) for s in seen):
+            continue
+        # A module can be legitimately gated on something CI provides in a SEPARATE job, such
+        # as a database service. That is a human decision, so it is declared in the file
+        # itself and printed here. An exemption nobody can see is how a check stops checking.
+        if EXEMPT in f.read_text():
+            exempt.append(rel)
+        else:
+            missing.append(rel)
+    if exempt:
+        print(f"note: {len(exempt)} test file(s) exempt by declaration and NOT counted: "
+              + ", ".join(exempt))
+    return missing
 
 
 def check(root: pathlib.Path) -> int:
@@ -50,7 +88,16 @@ def check(root: pathlib.Path) -> int:
     if not readme.is_file():
         print("FAIL: no README.md to check", file=sys.stderr)
         return 1
-    actual = collected_count(root)
+    actual, stdout = collect(root)
+    empty = silent_empty_test_files(root, stdout)
+    if empty:
+        print(f"FAIL: {len(empty)} test file(s) contributed no collected test: "
+              + ", ".join(empty) + "\n"
+              "       Usually an optional extra is missing, so a module guarded by\n"
+              "       pytest.importorskip vanished without an error. The count from this\n"
+              "       environment is NOT the project's count. Install every extra CI installs\n"
+              "       and re-run.", file=sys.stderr)
+        return 1
     declared = [int(n) for n in DECLARED.findall(readme.read_text())]
     if not declared:
         print(f"FAIL: README.md advertises no test count, so nothing was checked.\n"
@@ -91,6 +138,19 @@ def selftest() -> int:
             if got != want:
                 bad += 1
             print(f"  {flag}{why}: expected exit {want}, got {got}")
+        # the case that was learned late: a module skipped whole by importorskip leaves
+        # NO error, so the count looks healthy and is wrong.
+        (root / "README.md").write_text("3 tests, all green")
+        (root / "tests" / "test_optional.py").write_text(
+            'import pytest\n'
+            'pytest.importorskip("a_module_that_is_not_installed")\n'
+            'def test_z(): pass\n')
+        got = check(root)
+        flag = "ok  " if got == 1 else "BAD "
+        if got != 1:
+            bad += 1
+        print(f"  {flag}a silently skipped test file fails, though pytest reports no error: "
+              f"expected exit 1, got {got}")
     print("selftest FAILED" if bad else "selftest passed: the check can fail")
     return 1 if bad else 0
 

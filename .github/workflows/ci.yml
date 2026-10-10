@@ -19,8 +19,15 @@ jobs:
       - run: pip install -e ".[dev]"
       - name: Tests + coverage gate
         run: pytest -q --cov=mcptools --cov-report=term-missing --cov-fail-under=88
+      # Was scripts/check_readme_test_count.py here until 2026-10-10. Four other
+      # repositories held byte-identical copies, so it is a package now. Pinned to a
+      # commit, not main: a gate that tracks someone else's default branch is a gate
+      # that person can change, and it being me makes that worse rather than better.
       - name: README's advertised test count must match the suite
-        run: python scripts/check_readme_test_count.py
+        run: |
+          set -o pipefail
+          pip install "git+https://github.com/egnaro9/readme-test-count@6752d7ec7e6177aceff6359905b1d68ab90b546a"
+          readme-test-count
       - name: The server answers a real MCP handshake over stdio
         run: |
           printf '%s\n' \

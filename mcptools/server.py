@@ -78,9 +78,10 @@ TOOLS = [
         "name": "model_drift",
         "description": "Look up how a live LLM is currently scoring on a public, frozen eval suite "
                        "(accuracy, latency, answer length, reliability, refusal rate) and whether "
-                       "those moved since the previous weekly run. Use it to check whether a model "
+                       "those moved since the previous run. Use it to check whether a model "
                        "you're about to rely on has quietly changed. Omit `model` to list every "
-                       "tracked model.",
+                       "model the board still updates; series it has stopped updating are named "
+                       "with their last-run date and labelled as not current.",
         "inputSchema": {
             "type": "object",
             "properties": {"model": {"type": "string",

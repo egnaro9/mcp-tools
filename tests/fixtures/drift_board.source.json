@@ -1,0 +1,8 @@
+{
+ "url": "https://raw.githubusercontent.com/egnaro9/model-drift/main/dashboard/drift_board.json",
+ "http_status": 200,
+ "fetched_at": "2026-10-20T01:28:03Z",
+ "full_body_bytes": 1077136,
+ "full_body_sha256": "1993ee361febb9eaee1fc67227e76442111332959af13d22420e30a0566e302c",
+ "trim": "every top-level key verbatim; each series cut to its last 3 points"
+}

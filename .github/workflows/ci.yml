@@ -4,6 +4,10 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Weekly, for the live-endpoint step below: an upstream rename breaks a live tool
+  # without any push here, so only a scheduled run can notice it.
+  schedule:
+    - cron: "17 9 * * 1"
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -23,6 +27,18 @@ jobs:
       # repositories held byte-identical copies, so it is a package now. Pinned to a
       # commit, not main: a gate that tracks someone else's default branch is a gate
       # that person can change, and it being me makes that worse rather than better.
+      # The only check that can see the board move. model-drift renamed
+      # dashboard/metrics.json to drift_board.json on 2026-08-30 and model_drift
+      # returned HTTP 404 for seven weeks while every fixture test stayed green.
+      # The grep is there because a skipped test exits 0.
+      - name: The live model-drift board answers at the URL model_drift fetches
+        if: matrix.python-version == '3.12'
+        env:
+          MCPTOOLS_LIVE: "1"
+        run: |
+          set -o pipefail
+          pytest -q -p no:cacheprovider tests/test_live.py -k serves_the_board_live | tee live.out
+          grep -q "1 passed" live.out
       - name: README's advertised test count must match the suite
         run: |
           set -o pipefail
